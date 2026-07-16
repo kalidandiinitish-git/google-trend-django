@@ -1,0 +1,272 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TrendPulse — Google Trend Analyzer</title>
+  <meta name="description" content="Analyze Google search trends for any keyword. Explore interest over time, by region, and discover related queries with TrendPulse."/>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366F1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 18 12 15 21 9 3 6 12 2 12'/%3E%3C/svg%3E"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="{% static 'analyzer/css/style.css' %}"/>
+</head>
+<body>
+
+  <!-- ── ANIMATED BACKGROUND ─────────────────────────── -->
+  <div class="bg-layer" aria-hidden="true">
+    <canvas id="particle-canvas"></canvas>
+    <div class="aurora aurora-1"></div>
+    <div class="aurora aurora-2"></div>
+    <div class="aurora aurora-3"></div>
+    <div class="noise-overlay"></div>
+  </div>
+
+  <!-- ── HEADER ──────────────────────────────────────── -->
+  <header class="header" id="header">
+    <div class="header-inner">
+      <a class="logo" href="/">
+        <div class="logo-mark">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logoGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <defs><linearGradient id="logoGrad" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#818CF8"/><stop offset="100%" stop-color="#38BDF8"/></linearGradient></defs>
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="logo-wordmark">
+          <span class="logo-text">TrendPulse</span>
+          <span class="logo-divider">|</span>
+          <span class="logo-sub">Google Trend Analyzer</span>
+        </div>
+      </a>
+      <div class="header-actions">
+        <div id="mode-badge" class="mode-badge demo">
+          <span class="badge-dot"></span>
+          <span class="badge-label">Demo Mode</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── HERO SECTION ────────────────────────────────── -->
+  <section class="hero reveal" id="hero-section">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      <span>Powered by Google Trends API</span>
+    </div>
+    <h1 class="hero-title">
+      Discover What the<br/>
+      <span class="hero-accent">World is Searching</span>
+    </h1>
+    <p class="hero-sub">Real-time trend intelligence for any keyword — compare, analyze &amp; gain insights from global search data.</p>
+
+    <!-- Search Card -->
+    <div class="search-card">
+      <div class="search-card-glow"></div>
+      <div class="search-row">
+        <div class="input-wrap">
+          <svg class="input-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="keyword" type="text" placeholder="Search any keyword... (python, cricket, AI...)" autocomplete="off"/>
+        </div>
+        <div class="select-wrap">
+          <select id="timeframe">
+            <option value="now 1-H">Last 1 Hour</option>
+            <option value="now 7-d">Last 7 Days</option>
+            <option value="today 1-m">Last Month</option>
+            <option value="today 12-m" selected>Last 12 Months</option>
+            <option value="today 5-y">Last 5 Years</option>
+          </select>
+        </div>
+        <button id="btn-analyze" class="btn-primary" onclick="runAnalysis()">
+          <span id="btn-text">Analyze</span>
+          <span id="btn-spinner" class="spinner hidden"></span>
+          <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- Compare & Multi-Keyword toggles -->
+      <div class="compare-row">
+        <label class="toggle-wrap">
+          <input type="checkbox" id="compare-toggle" onchange="toggleCompare()"/>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Compare two keywords</span>
+        </label>
+        <label class="toggle-wrap" style="margin-left:1.5rem">
+          <input type="checkbox" id="multi-toggle" onchange="toggleMulti()"/>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Multi-keyword (up to 5)</span>
+        </label>
+      </div>
+
+      <!-- Compare inputs -->
+      <div id="compare-box" class="compare-inputs hidden">
+        <input id="kw1" type="text" placeholder="Keyword 1"/>
+        <span class="vs-badge">VS</span>
+        <input id="kw2" type="text" placeholder="Keyword 2"/>
+        <button class="btn-secondary" onclick="runCompare()">Compare</button>
+      </div>
+
+      <!-- Multi-keyword input -->
+      <div id="multi-box" class="compare-inputs hidden">
+        <input id="multi-kw" type="text" placeholder="Enter keywords separated by commas (e.g. python, java, react, vue, go)" style="flex:1;min-width:300px"/>
+        <button class="btn-secondary" onclick="runMulti()">Analyze All</button>
+      </div>
+    </div>
+
+    <div id="error-msg" class="error-msg hidden"></div>
+  </section>
+
+  <!-- ── STATS STRIP ─────────────────────────────────── -->
+  <div id="stats-strip" class="stats-strip hidden">
+    <div class="stat-card reveal" style="--delay:0.1s">
+      <div class="stat-icon-wrap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/></svg></div>
+      <div class="stat-body"><div class="stat-label">Keyword</div><div id="stat-kw" class="stat-value">—</div></div>
+    </div>
+    <div class="stat-card reveal" style="--delay:0.15s">
+      <div class="stat-icon-wrap trend-up"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <div class="stat-body"><div class="stat-label">Peak Interest</div><div id="stat-peak" class="stat-value">—</div></div>
+    </div>
+    <div class="stat-card reveal" style="--delay:0.2s">
+      <div class="stat-icon-wrap chart-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg></div>
+      <div class="stat-body"><div class="stat-label">Average</div><div id="stat-avg" class="stat-value">—</div></div>
+    </div>
+    <div class="stat-card reveal" style="--delay:0.25s">
+      <div class="stat-icon-wrap globe-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div>
+      <div class="stat-body"><div class="stat-label">Top Country</div><div id="stat-country" class="stat-value">—</div></div>
+    </div>
+  </div>
+
+  <!-- ── AI SUMMARY CARD ─────────────────────────────── -->
+  <div id="summary-section" class="summary-section hidden">
+    <div class="chart-card wide reveal ai-card" id="card-summary">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon ai"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/><path d="M9 18h6"/></svg></div>
+          AI Trend Insights
+        </div>
+        <div class="card-sub ai-badge">✨ AI-Powered Analysis</div>
+      </div>
+      <div id="summary-body" class="summary-body">
+        <p class="summary-text" id="summary-text"></p>
+        <div id="insights-list" class="insights-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CHARTS GRID ─────────────────────────────────── -->
+  <main class="charts-grid">
+
+    <!-- Interest Over Time (with prediction) -->
+    <div class="chart-card wide reveal" id="card-time">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+          Interest Over Time
+          <span class="prediction-badge hidden" id="pred-badge">+ Forecast</span>
+        </div>
+        <div id="time-sub" class="card-sub">Search a keyword to begin</div>
+      </div>
+      <div class="chart-area"><canvas id="timeChart"></canvas>
+        <div class="chart-placeholder" id="ph-time"><div class="ph-pulse"></div><div class="ph-text">Enter a keyword and click Analyze</div></div>
+      </div>
+    </div>
+
+    <!-- World Heatmap -->
+    <div class="chart-card wide reveal" id="card-heatmap">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon globe"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div>
+          World Interest Heatmap
+        </div>
+        <div id="heatmap-sub" class="card-sub">Search intensity by country</div>
+      </div>
+      <div class="heatmap-area" id="heatmap-area">
+        <div class="chart-placeholder" id="ph-heatmap"><div class="ph-pulse"></div><div class="ph-text">Heatmap will appear here</div></div>
+        <div class="heatmap-grid hidden" id="heatmap-grid"></div>
+        <div class="heatmap-legend hidden" id="heatmap-legend">
+          <span class="legend-low">Low</span>
+          <div class="legend-bar"></div>
+          <span class="legend-high">High</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- By Country (bar chart) -->
+    <div class="chart-card reveal" id="card-region">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon globe"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div>
+          Interest by Country
+        </div>
+        <div id="region-sub" class="card-sub">Top 10 countries</div>
+      </div>
+      <div class="chart-area"><canvas id="regionChart"></canvas>
+        <div class="chart-placeholder" id="ph-region"><div class="ph-pulse"></div><div class="ph-text">Country data will appear here</div></div>
+      </div>
+    </div>
+
+    <!-- Related Queries -->
+    <div class="chart-card reveal" id="card-related">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon related"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
+          Related Queries
+        </div>
+        <div class="card-sub">Top related searches</div>
+      </div>
+      <div id="related-tags" class="tags-area">
+        <div class="chart-placeholder"><div class="ph-pulse"></div><div class="ph-text">Related searches will appear here</div></div>
+      </div>
+    </div>
+
+    <!-- Compare -->
+    <div class="chart-card wide hidden" id="card-compare">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon compare"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg></div>
+          Keyword Comparison
+        </div>
+        <div id="compare-sub" class="card-sub">Side by side comparison</div>
+      </div>
+      <div class="chart-area"><canvas id="compareChart"></canvas></div>
+    </div>
+
+    <!-- Multi-Keyword Analysis -->
+    <div class="chart-card wide hidden" id="card-multi">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-title">
+          <div class="card-title-icon multi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 17l4-8 4 4 6-6"/></svg></div>
+          Multi-Keyword Analysis
+        </div>
+        <div id="multi-sub" class="card-sub">Compare up to 5 keywords</div>
+      </div>
+      <div class="chart-area"><canvas id="multiChart"></canvas></div>
+    </div>
+
+  </main>
+
+  <!-- ── FOOTER ──────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="url(#footerGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <defs><linearGradient id="footerGrad" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#818CF8"/><stop offset="100%" stop-color="#38BDF8"/></linearGradient></defs>
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <span>TrendPulse</span>
+      </div>
+      <p class="footer-copy">Built with Python &amp; Django · Data via Google Trends</p>
+    </div>
+  </footer>
+
+  <script src="{% static 'analyzer/js/main.js' %}"></script>
+</body>
+</html>
